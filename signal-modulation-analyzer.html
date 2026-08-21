@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SIGLAB-940 :: AM/FM Modulation Analyzer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  :root{
+    --void:#080B0F;
+    --panel:#0E141B;
+    --panel-raised:#121A22;
+    --grid:#1B2830;
+    --grid-strong:#25404a;
+    --amber:#FFB300;
+    --cyan:#3FE8D6;
+    --magenta:#FF4F7B;
+    --text-hi:#E9F1F4;
+    --text-dim:#6C8291;
+    --text-faint:#3E4F5A;
+    --danger:#FF4F4F;
+    --ok:#59E88A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 800px at 20% -10%, #101c22 0%, transparent 60%),
+      radial-gradient(ellipse 900px 700px at 100% 110%, #150e17 0%, transparent 55%),
+      var(--void);
+    color:var(--text-hi);
+    font-family:'IBM Plex Mono', monospace;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  #root{padding:20px;max-width:1400px;margin:0 auto;}
+
+  .nameplate{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px 24px;
+    padding:16px 22px;
+    border:1px solid var(--grid);
+    border-radius:4px;
+    background:linear-gradient(180deg, var(--panel-raised), var(--panel));
+    margin-bottom:16px;
+  }
+  .nameplate-left{display:flex; align-items:baseline; gap:14px;}
+  .brand{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:22px;
+    letter-spacing:0.5px;
+    color:var(--text-hi);
+  }
+  .brand span{color:var(--amber);}
+  .model{
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--text-dim);
+    border-left:1px solid var(--grid-strong);
+    padding-left:14px;
+  }
+  .status-strip{
+    display:flex;
+    gap:18px;
+    font-size:11px;
+    letter-spacing:1px;
+    color:var(--text-dim);
+    align-items:center;
+  }
+  .status-dot{
+    display:inline-block;
+    width:7px;height:7px;
+    border-radius:50%;
+    background:var(--ok);
+    box-shadow:0 0 8px var(--ok);
+    margin-right:6px;
+    animation:blink 2.4s ease-in-out infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .layout{
+    display:grid;
+    grid-template-columns:280px 1fr;
+    gap:16px;
+  }
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    border:1px solid var(--grid);
+    border-radius:4px;
+    background:linear-gradient(180deg, var(--panel-raised), var(--panel));
+    padding:18px;
+  }
+  .panel-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:11px;
+    letter-spacing:2.5px;
+    color:var(--text-dim);
+    margin:0 0 16px 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .panel-title .tick{color:var(--text-faint); font-weight:400; letter-spacing:1px;}
+
+  /* ---- Mode toggle ---- */
+  .mode-toggle{
+    display:flex;
+    border:1px solid var(--grid-strong);
+    border-radius:3px;
+    overflow:hidden;
+    margin-bottom:22px;
+  }
+  .mode-btn{
+    flex:1;
+    background:transparent;
+    border:none;
+    color:var(--text-dim);
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:1px;
+    padding:10px 0;
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .mode-btn.active.am{ background:rgba(255,179,0,0.12); color:var(--amber); box-shadow:inset 0 -2px 0 var(--amber); }
+  .mode-btn.active.fm{ background:rgba(63,232,214,0.12); color:var(--cyan); box-shadow:inset 0 -2px 0 var(--cyan); }
+  .mode-btn:not(.active):hover{ color:var(--text-hi); }
+
+  /* ---- Sliders ---- */
+  .control{ margin-bottom:22px; }
+  .control-label{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:11px;
+    letter-spacing:1.5px;
+    color:var(--text-dim);
+    margin-bottom:8px;
+  }
+  .control-label .name{color:var(--text-hi); font-weight:500;}
+  .control-label .val{
+    font-size:14px;
+    color:var(--amber);
+    font-weight:600;
+    letter-spacing:0;
+  }
+  .control-label .val.cyan{color:var(--cyan);}
+  .control-label .val.magenta{color:var(--magenta);}
+
+  input[type="range"]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:26px;
+    background:transparent;
+    cursor:pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height:4px;
+    background:linear-gradient(90deg, var(--grid-strong), var(--grid));
+    border-radius:2px;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;
+    margin-top:-6px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid #1a1206;
+    box-shadow:0 0 10px rgba(255,179,0,0.7);
+    cursor:grab;
+  }
+  input[type="range"].cyan::-webkit-slider-thumb{ background:var(--cyan); box-shadow:0 0 10px rgba(63,232,214,0.7); }
+  input[type="range"].magenta::-webkit-slider-thumb{ background:var(--magenta); box-shadow:0 0 10px rgba(255,79,123,0.7); }
+  input[type="range"]::-moz-range-track{
+    height:4px;
+    background:var(--grid-strong);
+    border-radius:2px;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:14px;height:14px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid #1a1206;
+    cursor:grab;
+  }
+  .range-ticks{
+    display:flex;
+    justify-content:space-between;
+    font-size:9px;
+    color:var(--text-faint);
+    margin-top:3px;
+    letter-spacing:0.5px;
+  }
+
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:11px;
+    letter-spacing:1px;
+    color:var(--text-dim);
+    padding-top:6px;
+    border-top:1px solid var(--grid);
+  }
+  .switch{
+    position:relative;
+    width:38px; height:20px;
+    background:var(--grid-strong);
+    border-radius:10px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .switch.on{ background:rgba(89,232,138,0.35); }
+  .switch::after{
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:16px; height:16px;
+    border-radius:50%;
+    background:var(--text-dim);
+    transition:all .15s ease;
+  }
+  .switch.on::after{ left:20px; background:var(--ok); box-shadow:0 0 6px var(--ok); }
+
+  /* ---- Scope panels ---- */
+  .scopes{ display:flex; flex-direction:column; gap:14px; }
+  .scope{
+    border:1px solid var(--grid);
+    border-radius:4px;
+    background:#04070A;
+    position:relative;
+    overflow:hidden;
+  }
+  .scope-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px 14px;
+    border-bottom:1px solid var(--grid);
+    background:linear-gradient(180deg, var(--panel-raised), var(--panel));
+  }
+  .scope-header .label{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:1.5px;
+  }
+  .scope-header .label.amber{color:var(--amber);}
+  .scope-header .label.cyan{color:var(--cyan);}
+  .scope-header .label.magenta{color:var(--magenta);}
+  .scope-header .eq{ font-size:11px; color:var(--text-dim); letter-spacing:0.5px; }
+  .scope canvas{ display:block; width:100%; }
+
+  /* ---- Readout grid ---- */
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:1px;
+    background:var(--grid);
+    border:1px solid var(--grid);
+    border-radius:4px;
+    overflow:hidden;
+    margin-top:14px;
+  }
+  .readout{
+    background:var(--panel);
+    padding:12px 14px;
+  }
+  .readout .rlabel{
+    font-size:9.5px;
+    letter-spacing:1.5px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .readout .rval{
+    font-size:19px;
+    font-weight:600;
+    color:var(--text-hi);
+    font-family:'Space Grotesk', sans-serif;
+  }
+  .readout .rval .unit{ font-size:12px; color:var(--text-dim); margin-left:3px; font-family:'IBM Plex Mono',monospace; font-weight:400;}
+  .readout.flag .rval{ color:var(--danger); }
+  .readout.good .rval{ color:var(--ok); }
+
+  footer{
+    margin-top:18px;
+    text-align:center;
+    font-size:10px;
+    letter-spacing:1.5px;
+    color:var(--text-faint);
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ---------- helpers ---------- */
+function niceNum(n, digits=2){
+  return Number(n.toFixed(digits)).toString();
+}
+
+/* Draw an oscilloscope-style trace onto a canvas */
+function drawScope(canvas, samples, opts){
+  const { color, amplitudeScale = 1, dpr } = opts;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1 * dpr;
+  const cols = 10, rows = 6;
+  for(let i=0;i<=cols;i++){
+    const x = (w/cols)*i;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+  }
+  for(let j=0;j<=rows;j++){
+    const y = (h/rows)*j;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+  // center line
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+
+  // trace glow
+  const mid = h/2;
+  const amp = (h/2 - 10) * amplitudeScale;
+
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10 * dpr;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2 * dpr;
+  ctx.beginPath();
+  const n = samples.length;
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1)) * w;
+    const y = mid - samples[i]*amp;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // fainter core line for crispness
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1 * dpr;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const x = (i/(n-1)) * w;
+    const y = mid - samples[i]*amp;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function useResizeCanvas(ref, heightCss){
+  useEffect(()=>{
+    const canvas = ref.current;
+    if(!canvas) return;
+    function resize(){
+      const dpr = window.devicePixelRatio || 1;
+      const parentWidth = canvas.parentElement.clientWidth;
+      canvas.style.width = parentWidth + 'px';
+      canvas.style.height = heightCss + 'px';
+      canvas.width = Math.floor(parentWidth * dpr);
+      canvas.height = Math.floor(heightCss * dpr);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    return ()=>window.removeEventListener('resize', resize);
+  },[heightCss]);
+}
+
+/* ---------- Scope component ---------- */
+function Scope({ label, colorVar, colorHex, equation, samples, amplitudeScale, height=140 }){
+  const canvasRef = useRef(null);
+  useResizeCanvas(canvasRef, height);
+
+  useEffect(()=>{
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    drawScope(canvas, samples, { color: colorHex, amplitudeScale, dpr });
+  });
+
+  return (
+    <div className="scope">
+      <div className="scope-header">
+        <span className={"label " + colorVar}>{label}</span>
+        <span className="eq">{equation}</span>
+      </div>
+      <canvas ref={canvasRef}></canvas>
+    </div>
+  );
+}
+
+/* ---------- Main App ---------- */
+function App(){
+  const [mode, setMode] = useState('AM'); // 'AM' | 'FM'
+  const [fc, setFc] = useState(24);        // carrier freq (Hz, visual scale)
+  const [fm, setFm] = useState(3);         // message freq (Hz)
+  const [amIndex, setAmIndex] = useState(0.7);   // AM modulation index (ka), 0-1.5
+  const [fmIndex, setFmIndex] = useState(4);     // FM modulation index (beta), 0-10
+  const [animate, setAnimate] = useState(true);
+  const phaseRef = useRef(0);
+  const [, forceTick] = useState(0);
+
+  // live scrolling animation
+  useEffect(()=>{
+    if(!animate) return;
+    let raf;
+    let last = performance.now();
+    const loop = (now)=>{
+      const dt = (now - last)/1000;
+      last = now;
+      phaseRef.current += dt * 0.6; // scroll speed
+      forceTick(t=>t+1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return ()=>cancelAnimationFrame(raf);
+  },[animate]);
+
+  const modIndex = mode === 'AM' ? amIndex : fmIndex;
+
+  const { message, carrier, modulated } = useMemo(()=>{
+    const N = 900;
+    const cycles = 3; // message cycles shown
+    const duration = cycles / fm;
+    const t0 = animate ? phaseRef.current : 0;
+    const msg = new Array(N);
+    const car = new Array(N);
+    const mod = new Array(N);
+
+    for(let i=0;i<N;i++){
+      const t = t0 + (i/(N-1)) * duration;
+      const m = Math.cos(2*Math.PI*fm*t);
+      msg[i] = m;
+      car[i] = Math.cos(2*Math.PI*fc*t);
+      if(mode === 'AM'){
+        mod[i] = (1 + amIndex*m) * Math.cos(2*Math.PI*fc*t);
+      } else {
+        mod[i] = Math.cos(2*Math.PI*fc*t + fmIndex*Math.sin(2*Math.PI*fm*t));
+      }
+    }
+    return { message: msg, carrier: car, modulated: mod };
+    // eslint-disable-next-line
+  },[fc, fm, amIndex, fmIndex, mode, phaseRef.current, animate]);
+
+  // metrics
+  const depthPct = niceNum(amIndex*100, 0);
+  const overmodulated = amIndex > 1;
+  const amBandwidth = niceNum(2*fm, 2);
+  const fmDeviation = niceNum(fmIndex*fm, 2);
+  const fmBandwidth = niceNum(2*(fmIndex+1)*fm, 2); // Carson's Rule
+  const sidebandPairs = Math.max(1, Math.ceil(fmIndex + 1));
+
+  const modAmpScale = mode === 'AM' ? Math.min(1, (1+amIndex)/2.2) : 0.92;
+
+  return (
+    <div>
+      <div className="nameplate">
+        <div className="nameplate-left">
+          <div className="brand">SIGLAB<span>-940</span></div>
+          <div className="model">AM / FM MODULATION ANALYZER &nbsp;·&nbsp; TIME-DOMAIN</div>
+        </div>
+        <div className="status-strip">
+          <span><span className="status-dot"></span>LIVE</span>
+          <span>MODE: {mode}</span>
+          <span>fc = {fc} Hz</span>
+          <span>fm = {fm} Hz</span>
+        </div>
+      </div>
+
+      <div className="layout">
+        {/* CONTROL PANEL */}
+        <div className="panel">
+          <div className="panel-title">CONTROL PANEL <span className="tick">§1</span></div>
+
+          <div className="mode-toggle">
+            <button
+              className={"mode-btn am" + (mode==='AM' ? ' active' : '')}
+              onClick={()=>setMode('AM')}
+            >AM</button>
+            <button
+              className={"mode-btn fm" + (mode==='FM' ? ' active' : '')}
+              onClick={()=>setMode('FM')}
+            >FM</button>
+          </div>
+
+          <div className="control">
+            <div className="control-label">
+              <span className="name">Carrier Frequency</span>
+              <span className="val">{fc} <span style={{fontSize:'11px'}}>Hz</span></span>
+            </div>
+            <input type="range" min="5" max="60" step="1" value={fc}
+              onChange={e=>setFc(Number(e.target.value))} />
+            <div className="range-ticks"><span>5</span><span>60</span></div>
+          </div>
+
+          <div className="control">
+            <div className="control-label">
+              <span className="name">Message Frequency</span>
+              <span className="val cyan">{fm} <span style={{fontSize:'11px'}}>Hz</span></span>
+            </div>
+            <input className="cyan" type="range" min="1" max="12" step="0.5" value={fm}
+              onChange={e=>setFm(Number(e.target.value))} />
+            <div className="range-ticks"><span>1</span><span>12</span></div>
+          </div>
+
+          {mode === 'AM' ? (
+            <div className="control">
+              <div className="control-label">
+                <span className="name">Modulation Index (ka)</span>
+                <span className="val magenta">{niceNum(amIndex,2)}</span>
+              </div>
+              <input className="magenta" type="range" min="0" max="1.5" step="0.05" value={amIndex}
+                onChange={e=>setAmIndex(Number(e.target.value))} />
+              <div className="range-ticks"><span>0 (none)</span><span>1.5 (over)</span></div>
+            </div>
+          ) : (
+            <div className="control">
+              <div className="control-label">
+                <span className="name">Modulation Index (β)</span>
+                <span className="val magenta">{niceNum(fmIndex,2)}</span>
+              </div>
+              <input className="magenta" type="range" min="0" max="10" step="0.1" value={fmIndex}
+                onChange={e=>setFmIndex(Number(e.target.value))} />
+              <div className="range-ticks"><span>0</span><span>10</span></div>
+            </div>
+          )}
+
+          <div className="toggle-row">
+            <span>LIVE SWEEP</span>
+            <div className={"switch" + (animate ? ' on' : '')} onClick={()=>setAnimate(a=>!a)}></div>
+          </div>
+        </div>
+
+        {/* SCOPES + READOUTS */}
+        <div>
+          <div className="scopes">
+            <Scope
+              label="MESSAGE m(t)"
+              colorVar="cyan"
+              colorHex="#3FE8D6"
+              equation="cos(2π·fm·t)"
+              samples={message}
+              amplitudeScale={0.85}
+            />
+            <Scope
+              label="CARRIER c(t)"
+              colorVar="amber"
+              colorHex="#FFB300"
+              equation="cos(2π·fc·t)"
+              samples={carrier}
+              amplitudeScale={0.85}
+            />
+            <Scope
+              label={mode === 'AM' ? "AM SIGNAL s(t)" : "FM SIGNAL s(t)"}
+              colorVar="magenta"
+              colorHex="#FF4F7B"
+              equation={mode==='AM'
+                ? "(1+ka·m(t))·cos(2π·fc·t)"
+                : "cos(2π·fc·t + β·sin(2π·fm·t))"}
+              samples={modulated}
+              amplitudeScale={modAmpScale}
+              height={170}
+            />
+          </div>
+
+          <div className="readouts">
+            {mode === 'AM' ? (
+              <>
+                <div className={"readout" + (overmodulated ? " flag" : " good")}>
+                  <div className="rlabel">MODULATION DEPTH</div>
+                  <div className="rval">{depthPct}<span className="unit">%</span></div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">SIGNAL BANDWIDTH</div>
+                  <div className="rval">{amBandwidth}<span className="unit">Hz</span></div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">UPPER SIDEBAND</div>
+                  <div className="rval">{niceNum(fc+fm,2)}<span className="unit">Hz</span></div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">LOWER SIDEBAND</div>
+                  <div className="rval">{niceNum(fc-fm,2)}<span className="unit">Hz</span></div>
+                </div>
+                <div className={"readout" + (overmodulated ? " flag" : "")}>
+                  <div className="rlabel">STATUS</div>
+                  <div className="rval" style={{fontSize:'14px'}}>
+                    {overmodulated ? "OVERMODULATED" : "CLEAN ENVELOPE"}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="readout">
+                  <div className="rlabel">PEAK DEVIATION (Δf)</div>
+                  <div className="rval">{fmDeviation}<span className="unit">Hz</span></div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">CARSON BANDWIDTH</div>
+                  <div className="rval">{fmBandwidth}<span className="unit">Hz</span></div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">MOD. INDEX (β)</div>
+                  <div className="rval">{niceNum(fmIndex,2)}</div>
+                </div>
+                <div className="readout">
+                  <div className="rlabel">SIGNIFICANT SIDEBANDS</div>
+                  <div className="rval">±{sidebandPairs}</div>
+                </div>
+                <div className="readout good">
+                  <div className="rlabel">CLASSIFICATION</div>
+                  <div className="rval" style={{fontSize:'14px'}}>
+                    {fmIndex < 1 ? "NARROWBAND FM" : "WIDEBAND FM"}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <footer>SIGLAB-940 SERIES &nbsp;·&nbsp; TIME-DOMAIN MODULATION ANALYZER &nbsp;·&nbsp; FOR EDUCATIONAL USE</footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
